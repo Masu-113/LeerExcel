@@ -1,4 +1,6 @@
 from openpyxl import load_workbook
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from PIL import Image, ImageDraw, ImageFont
 import os
 import numpy as np
@@ -79,11 +81,19 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
 imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
 archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
 hoja_a_usar = "Sheet1"
-rango_a_leer = "A1:F10"
+rango_a_leer = "A1:M10"
 fuente_personalizada = r"C:\Windows\Fonts\Arial.ttf"
 tamaño_fuente = 30
 
+#mostrar los ejes de la imagen
+
+
 # Definir anchos de columnas
-anchos_definidos = [124, 125, 126, 124, 125, 124]
+anchos_definidos = [124, 125, 126, 124, 125, 124, 125, 124, 125, 124, 125, 124, 125, 124]
 
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos)
+
+img = mpimg.imread(r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1_modificada.jpg')
+plt.imshow(img)
+plt.xticks([0,100,200,300])
+plt.axis('on')

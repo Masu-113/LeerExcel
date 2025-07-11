@@ -1,37 +1,52 @@
-import pandas as pd
-from PIL import Image, ImageDraw, ImageFont
+from openpyxl import load_workbook
+from PIL  import Image, ImageDraw, ImageFont
+import tkinter as tk
+from tkinter import ttk, filedialog
+from PIL import ImageTk, Image
 
-# Reemplaza con la ruta de tu archivo Excel
-excel_file = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
-df = pd.read_excel(excel_file)
+def leer_excel (ruta_archivo, hoja, rango_celdas):
+    ruta_archivo = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
+    workbook = load_workbook(ruta_archivo)
+    hoja = workbook[hoja]
+    datos = []
+    for fila in hoja[rango_celdas]:
+        fila_datos = [celda.value for celda in fila]
+        datos.append(fila_datos)
+    return datos
 
-# Imprime el DataFrame para verificar
-print(df)
+def agregar_texto_a_imagen(ruta_imagen, texto, posicion, fuente_nombre, tamaño_fuente, color):
+    ruta_imagen = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
+    imagen = Image.open(ruta_imagen)
+    dibujo = ImageDraw.Draw(imagen)
+    fuente = ImageFont.truetype(fuente_nombre, tamaño_fuente)
+    dibujo.text(posicion, texto, font=fuente, fill=color)
+    return imagen
 
-# Reemplaza con la ruta de tu imagen
-image_path = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
-image = Image.open(image_path)
-draw = ImageDraw.Draw(image)
 
-# Reemplaza con la ruta a tu archivo de fuente y el tamaño deseado
-font_path =  r"C:\Windows\Fonts\Arial.ttf"
-font_size = 20
-font = ImageFont.truetype(font_path, font_size)
+def mostrar_interfaz(imagen, datos):
+    ventana = tk.Tk()
+    ventana.title("Mostrar Datos de Excel en Imagen")
 
-# Coordenadas iniciales del pixel
-x_start = 100
-y_start = 100
+    # Marco para la imagen
+    marco_imagen = ttk.Frame(ventana, padding=10)
+    marco_imagen.pack()
 
-# Espaciado entre líneas
-line_height = font_size + 5  # Ajusta según sea necesario
+    # Mostrar la imagen
+    imagen_tk = ImageTk.PhotoImage(imagen)
+    etiqueta_imagen = tk.Label(marco_imagen, image=imagen_tk)
+    etiqueta_imagen.image = imagen_tk  # Mantener referencia
+    etiqueta_imagen.pack()
 
-# Itera sobre las filas del DataFrame y dibuja cada valor
-for index, row in df.iterrows():
-    text = str(row['Nombres'])  
-    text_id = str(row['id']) # Reemplaza 'columna_a_dibujar'
-    draw.text((x_start, y_start), text, fill=(0, 0, 0), font=font)
-    draw.text((x_start, y_start), text_id, fill=(0, 0, 0), font=font)  # Dibuja el texto
-    y_start += line_height  # Incrementa la posición vertical
+    # Marco para el textbox
+    marco_textbox = ttk.Frame(ventana, padding=10)
+    marco_textbox.pack()
 
-# Guarda la imagen modificada
-image.save('imagen_con_texto.png')
+    # Textbox
+    textbox = tk.Text(marco_textbox, height=10, width=50)
+    textbox.pack()
+
+    # Insertar datos en el textbox
+    for fila in datos:
+        textbox.insert(tk.END, ", ".join(map(str, fila)) + "\n")
+
+    ventana.mainloop()
