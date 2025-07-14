@@ -1,30 +1,123 @@
-from PIL import Image
+from openpyxl import load_workbook
+from PIL import Image, ImageDraw, ImageFont
+import os
+import numpy as np
+import pytesseract
 
-def modificar_imagen(ruta_imagen, nuevo_ancho, nuevo_alto):
-    ruta_imagen = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1_modificada.jpg'
+def limpiar_texto(texto):
+    """Limpia el texto extraído de carascteres no deseados."""
+    return texto.replace('}', '').replace('{', '').replace(']', '').replace('[', '').strip()
+
+def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas, anchos_col):
+    
+    imagen_gris = imagen.convert("L")
+    imagen_binarizada = imagen_gris.point(lambda x: 0 if x < 100 else 255, '1')  # Umbral ajustado
+    datos_originales = []
+    margen = 12  # Márgen extra alrededor del texto
+
+    for fila in range(filas):
+        fila_textos = []
+        x = pos_x
+        y = pos_y + fila * sep_lineas
+        for col in range(columnas):
+            ancho = anchos_col[col]
+            recorte = imagen_binarizada.crop((x - margen, y, x + ancho + margen, y + sep_lineas))
+
+            # Imprimir coordenadas del recorte
+            print(f"Coordenadas del recorte (columna {col + 1}, fila {fila + 1}): ({x - margen}, {y}) - ({x + ancho + margen}, {y + sep_lineas})")
+
+            texto = pytesseract.image_to_string(recorte, config='--psm 6').strip()  # Modo de segmentación ajustado
+            texto_limpio = limpiar_texto(texto)  # Limpiar el texto
+            print(f"Texto extraído: '{texto_limpio}' (columna {col + 1}, fila {fila + 1})")  # Para depuración
+            fila_textos.append(texto_limpio)
+            x += ancho + 42
+        datos_originales.append(fila_textos)
+
+    return np.array(datos_originales)
+
+def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas, fuente_path=None, tamaño_fuente=12, anchos_columnas_definidos=None):
     try:
-        img = Image.open(ruta_imagen)
-        ancho, alto = img.size
+        # Cargar imagen
+        imagen = Image.open(imagen_path)
+        dibujo = ImageDraw.Draw(imagen)
 
-        # Ejemplo: Redimensionar la imagen
-        img_redimensionada = img.resize((nuevo_ancho, nuevo_alto))
+        # Excel
+        workbook = load_workbook(excel_path)
+        sheet = workbook[hoja_excel]
+        datos = [[cell.value for cell in row] for row in sheet[rango_celdas]]
+        datos_array = np.array(datos)
 
-        # Ejemplo: Cambiar el color de ciertos píxeles (fila 10, columna 20)
-        if ancho > 100 and alto > 100:
-            pix = img_redimensionada.load()
-            pix[10, 20] = (255, 0, 0)  # Rojo
+        # Fuente
+        if fuente_path and os.path.exists(fuente_path):
+            try:
+                fuente = ImageFont.truetype(fuente_path, tamaño_fuente)
+            except:
+                fuente = ImageFont.load_default()
+        else:
+            fuente = ImageFont.load_default()
 
-        # Guarda la imagen modificada
-        nombre_base, extension = ruta_imagen.split('.')
-        nueva_ruta = f"{nombre_base}_modificada.{extension}"
-        img_redimensionada.save(nueva_ruta)
-        print(f"Imagen modificada guardada en: {nueva_ruta}")
+        # Posiciones
+        posicion_x = 147
+        posicion_y = 153
+        separacion_lineas = tamaño_fuente + 13
+        num_columnas = datos_array.shape[1]
+        num_filas = datos_array.shape[0]
+
+        # Anchos
+        anchos_columnas = [0] * num_columnas
+        if anchos_columnas_definidos:
+            anchos_columnas = anchos_columnas_definidos
+        else:
+            for fila in datos_array:
+                for idx, dato in enumerate(fila):
+                    texto_dato = str(dato) if dato is not None else ""
+                    bbox = dibujo.textbbox((0, 0), texto_dato, font=fuente)
+                    anchos_columnas[idx] = max(anchos_columnas[idx], bbox[2] - bbox[0])
+
+        # Extraer texto original
+        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_columnas)
+
+        # Dibujar y comparar
+        y_actual = posicion_y
+        tolerancia_pixeles = 20  # Aumentar la tolerancia
+
+        for f_idx, fila in enumerate(datos_array):
+            x_actual = posicion_x
+            for c_idx, dato in enumerate(fila):
+                texto_nuevo = str(dato) if dato is not None else ""
+                bbox_nuevo = dibujo.textbbox((0, 0), texto_nuevo, font=fuente)
+                ancho_nuevo = bbox_nuevo[2] - bbox_nuevo[0]
+
+                texto_original = originales_array[f_idx][c_idx] if f_idx < originales_array.shape[0] and c_idx < originales_array.shape[1] else ""
+                bbox_original = dibujo.textbbox((0, 0), texto_original, font=fuente)
+                ancho_original = bbox_original[2] - bbox_original[0]
+
+                if ancho_nuevo > ancho_original + tolerancia_pixeles:
+                    print(f"Advertencia: '{texto_nuevo}' no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
+
+                dibujo.text((x_actual, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
+                x_actual += anchos_columnas[c_idx] + 42
+            y_actual += separacion_lineas
+
+        # Guardar imagen
+        nombre_imagen, extension = os.path.splitext(imagen_path)
+        imagen_modificada = f"{nombre_imagen}_modificada{extension}"
+        imagen.save(imagen_modificada)
+        print(f"Imagen guardada como {imagen_modificada}")
 
     except FileNotFoundError:
-        print(f"Error: Archivo no encontrado en {ruta_imagen}")
+        print("Error: Archivo no encontrado.")
     except Exception as e:
         print(f"Ocurrió un error: {e}")
 
+# Parámetros
+imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel-main\LeerExcel-main\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
+hoja_a_usar = "Hoja1"
+rango_a_leer = "A1:M10"
+fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
+tamaño_fuente = 30
+anchos_definidos = [124, 125, 126, 124, 125, 124, 125, 124, 125, 124, 125, 124, 125, 124]
 
-# Ejemplo de uso
-modificar_imagen("imagen.jpg", 2700, 4200)
+# Ejecutar
+sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos)
