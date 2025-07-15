@@ -4,7 +4,6 @@ import os
 import numpy as np
 import pytesseract
 import xml.etree.ElementTree as ET
-
 # Función para obtener los cuadros delimitadores de las columnas desde un XML
 def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, table_bounding_box, threshhold=3):
     root = ET.parse(column_xml_path).getroot()
@@ -52,11 +51,11 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
             ancho = anchos_col[col]
             recorte = imagen_binarizada.crop((x - margen, y, x + ancho + margen, y + sep_lineas))
             # Escalar recorte (doble tamaño)
-            recorte = recorte.resize((recorte.width * 2, recorte.height * 2))
+            recorte = recorte.resize((recorte.width * 3, recorte.height * 2))
             # Guardar cada recorte como imagen temporal para inspección
             recorte.save(f"recorte_f{fila}_c{col}.png")
             # Realizar OCR
-            texto = pytesseract.image_to_string(recorte, config='--psm 7').strip()
+            texto = pytesseract.image_to_string(recorte, config='--psm 6').strip()
 
             fila_textos.append(texto)
             x += ancho + 42
@@ -69,16 +68,13 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         # Cargar imagen
         imagen = Image.open(imagen_path)
         dibujo = ImageDraw.Draw(imagen)
-
         # Excel
         workbook = load_workbook(excel_path)
         sheet = workbook[hoja_excel]
         datos = [[cell.value for cell in row] for row in sheet[rango_celdas]]
         datos_array = np.array(datos)
-
         # Imprimir los datos leídos
-        print("Datos leídos del Excel:", datos_array)
-
+        print("Datos leidos del Excel:", datos_array)
         # Fuente
         if fuente_path and os.path.exists(fuente_path):
             try:
@@ -178,14 +174,14 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrió un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
-hoja_a_usar = "Hoja1"
+imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
+hoja_a_usar = "Sheet1"
 rango_a_leer = "A1:F10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
 anchos_definidos = [124, 125, 126, 124, 125, 124, 125, 124, 125, 124, 125, 124, 125, 124]
-column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\column_bounding_boxes.xml'  # Ruta del XML de columnas
+column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'  # Ruta del XML de columnas
 
 # Ejecutar
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)

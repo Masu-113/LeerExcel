@@ -10,7 +10,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
     imagen_binarizada = imagen_gris.point(lambda x: 0 if x < 160 else 255, '1')  # Binariza para mejorar OCR
     #imagen_binarizada = imagen_gris.point(lambda x: 255 if x > 90 else 0, mode = '1')
     datos_originales = []
-    margen = 12
+    margen = 20
 
     for fila in range(filas):
         fila_textos = []
@@ -102,9 +102,9 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrió un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
-hoja_a_usar = "Hoja1"
+imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
+hoja_a_usar = "Sheet1"
 rango_a_leer = "A1:M10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
