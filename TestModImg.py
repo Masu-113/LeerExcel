@@ -102,9 +102,9 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrió un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\imagen_binarizada_color.jpg'
-archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
-hoja_a_usar = "Sheet1"
+imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
+hoja_a_usar = "Hoja1"
 rango_a_leer = "A1:M10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
