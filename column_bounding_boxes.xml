@@ -35,4 +35,11 @@
         <xmax>700</xmax>
         <ymax>200</ymax>
     </bndbox>
+    <bndbox>
+        <xmin>710</xmin>
+        <ymin>100</ymin>
+        <xmax>810</xmax>
+        <ymax>200</ymax>
+    </bndbox>
+
 </columns>
