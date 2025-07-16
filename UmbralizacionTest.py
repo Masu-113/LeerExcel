@@ -4,7 +4,8 @@ import os
 import numpy as np
 import pytesseract
 import xml.etree.ElementTree as ET
-# Función para obtener los cuadros delimitadores de las columnas desde un XML
+import re
+
 def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, table_bounding_box, threshhold=3):
     root = ET.parse(column_xml_path).getroot()
     column_bounding_box = []
@@ -15,11 +16,9 @@ def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, t
         xmax = int(bndbox.find('xmax').text)
         ymax = int(bndbox.find('ymax').text)
 
-        # Escala las coordenadas
         scale_x = new_image_shape[1] / old_image_shape[1]
         scale_y = new_image_shape[0] / old_image_shape[0]
 
-        # Redondea las coordenadas escaladas
         scaled_xmin = round(xmin * scale_x)
         scaled_ymin = round(ymin * scale_y)
         scaled_xmax = round(xmax * scale_x)
@@ -27,7 +26,6 @@ def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, t
 
         column_bounding_box.append((scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax))
 
-    # Aproximar el cuadro delimitador de la tabla si no se proporciona
     if len(table_bounding_box) == 0:
         min_x = min(bbox[0] for bbox in column_bounding_box) - threshhold
         min_y = min(bbox[1] for bbox in column_bounding_box) - threshhold
@@ -37,45 +35,60 @@ def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, t
 
     return column_bounding_box, table_bounding_box
 
-def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas, anchos_col):
+def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas, anchos_col, offset_x=0, margen_lateral=20):
     imagen_gris = imagen.convert("L")
-    imagen_binarizada = imagen_gris.point(lambda x: 0 if x < 150 else 255, '1')  # Binariza para mejorar OCR
+    imagen_binarizada = imagen_gris.point(lambda x: 0 if x < 150 else 255, '1')
     datos_originales = []
-    margen = 20
 
     for fila in range(filas):
         fila_textos = []
-        x = pos_x
+        x = pos_x + offset_x
         y = pos_y + fila * sep_lineas
         for col in range(columnas):
             ancho = anchos_col[col]
-            recorte = imagen_binarizada.crop((x - margen, y, x + ancho + margen, y + sep_lineas))
-            # Escalar recorte (doble tamaño)
+            recorte = imagen_binarizada.crop((x - margen_lateral, y, x + ancho + margen_lateral, y + sep_lineas))
             recorte = recorte.resize((recorte.width * 3, recorte.height * 2))
-            # Guardar cada recorte como imagen temporal para inspección
+            # --- esta parte de aqui guarda los recortes temporales ---
             recorte.save(f"recorte_f{fila}_c{col}.png")
-            # Realizar OCR
+            # --------
             texto = pytesseract.image_to_string(recorte, config='--psm 6').strip()
-
             fila_textos.append(texto)
-            x += ancho + 42
+            x += ancho + (2 * margen_lateral)
         datos_originales.append(fila_textos)
 
     return np.array(datos_originales)
+#esto es para limpiar el ruido en  la imagen
+def es_texto_ruido(texto):
+    texto = texto.strip()
+    if texto == "":
+        return True
+    if re.fullmatch(r"[|/\\\-_.,;:]+", texto):
+        return True
+    if re.fullmatch(r"[A-Za-z]{1,2}", texto):
+        return True
+    if len(set(texto.lower())) == 1 and texto.isalpha():
+        return True
+    if not re.search(r"[A-Za-z0-9]", texto):
+        return True
+    # Añadir condición: menos de 5 caracteres y solo letras y espacios
+    if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "").isalpha():
+        return True
 
-def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas, fuente_path=None, tamaño_fuente=11, anchos_columnas_definidos=None, column_xml_path=None):
+    return False
+
+def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas,
+                                  fuente_path=None, tamaño_fuente=11,
+                                  anchos_columnas_definidos=None, column_xml_path=None):
     try:
-        # Cargar imagen
         imagen = Image.open(imagen_path)
         dibujo = ImageDraw.Draw(imagen)
-        # Excel
+
         workbook = load_workbook(excel_path)
         sheet = workbook[hoja_excel]
         datos = [[cell.value for cell in row] for row in sheet[rango_celdas]]
         datos_array = np.array(datos)
-        # Imprimir los datos leídos
         print("Datos leidos del Excel:", datos_array)
-        # Fuente
+
         if fuente_path and os.path.exists(fuente_path):
             try:
                 fuente = ImageFont.truetype(fuente_path, tamaño_fuente)
@@ -84,14 +97,12 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         else:
             fuente = ImageFont.load_default()
 
-        # Posiciones
         posicion_x = 147
         posicion_y = 153
         separacion_lineas = tamaño_fuente + 13
         num_columnas = datos_array.shape[1]
         num_filas = datos_array.shape[0]
 
-        # Anchos
         anchos_columnas = [0] * num_columnas
         if anchos_columnas_definidos:
             anchos_columnas = anchos_columnas_definidos
@@ -102,34 +113,22 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                     bbox = dibujo.textbbox((0, 0), texto_dato, font=fuente)
                     anchos_columnas[idx] = max(anchos_columnas[idx], bbox[2] - bbox[0])
 
-        # Obtener la forma antigua y nueva de la imagen
-        old_image_shape = imagen.size  # (width, height)
+        old_image_shape = imagen.size
         new_image_shape = (imagen.height, imagen.width)
 
-        # Obtener los cuadros delimitadores de columnas y la tabla
         column_bounding_box, table_bounding_box = get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, [])
-
-        # Imprimir los cuadros delimitadores
         print("Cuadros delimitadores de columnas:", column_bounding_box)
 
-        # Definir posiciones y tamaños
-        pos_x = table_bounding_box[0][0]  # x_min de la tabla
-        pos_y = table_bounding_box[0][1]  # y_min de la tabla
-        sep_lineas = table_bounding_box[0][3] - table_bounding_box[0][1]  # altura de la tabla
-        anchos_col = [column[2] - column[0] for column in column_bounding_box]  # ancho de cada columna
+        anchos_col = [column[2] - column[0] for column in column_bounding_box]
+        #posiciones para marcar donde va a dibujar y el espacio entre cada cap
+        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=39, margen_lateral=46)
+        print("Textos originales extraidos:", originales_array)
 
-        # Extraer texto original
-        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, pos_x, pos_y, sep_lineas, anchos_col)
-
-        # Imprimir los textos originales
-        print("Textos originales extraídos:", originales_array)
-
-        # Dibujar y comparar
         y_actual = posicion_y
-        tolerancia_pixeles = 15  # margen de comparación
+        tolerancia_pixeles = 15
 
         for f_idx, fila in enumerate(datos_array):
-            if all(dato is None for dato in fila):  # Saltar filas completamente vacías
+            if all(dato is None for dato in fila):
                 continue
             x_actual = posicion_x
             for c_idx, dato in enumerate(fila):
@@ -137,32 +136,23 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 bbox_nuevo = dibujo.textbbox((0, 0), texto_nuevo, font=fuente)
                 ancho_nuevo = bbox_nuevo[2] - bbox_nuevo[0]
 
-                # Verificar que el índice está dentro de los límites
+                texto_original = ""
                 if f_idx < originales_array.shape[0] and c_idx < originales_array.shape[1]:
                     texto_original = originales_array[f_idx][c_idx]
-                else:
-                    texto_original = ""  # O manejar el caso de otra manera
+                ancho_original = dibujo.textbbox((0, 0), texto_original, font=fuente)[2] - dibujo.textbbox((0, 0), texto_original, font=fuente)[0]
+                print(f"Dato: [{texto_nuevo}] hubicado en columna {c_idx + 1}, fila {f_idx + 1}")
 
-                bbox_original = dibujo.textbbox((0, 0), texto_original, font=fuente)
-                ancho_original = bbox_original[2] - bbox_original[0]
-
-                if texto_original.strip() == "":
-                    # Si el OCR no detectó texto, asumir que la celda esta vacía
+                if texto_original.strip() == "" or es_texto_ruido(texto_original):
                     if ancho_nuevo > anchos_col[c_idx] + tolerancia_pixeles:
-                        print(f"Advertencia: '{texto_nuevo}' podría no caber en columna {c_idx + 1}, fila {f_idx + 1} (celda vacía en imagen)")
+                        print(f"Advertencia: [{texto_nuevo}] podria no caber en columna {c_idx + 1}, fila {f_idx + 1} (celda vacia en imagen)")
                 else:
-                    # Si sí hay texto original, comparar con el nuevo
-                    bbox_original = dibujo.textbbox((0, 0), texto_original, font=fuente)
-                    ancho_original = bbox_original[2] - bbox_original[0]
-
                     if ancho_nuevo > ancho_original + tolerancia_pixeles:
-                        print(f"Advertencia: '{texto_nuevo}' no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
+                        print(f"Advertencia: [{texto_nuevo}] no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
 
                 dibujo.text((x_actual, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
-                x_actual += anchos_columnas[c_idx] + 42
+                x_actual += anchos_columnas[c_idx] +  42
             y_actual += separacion_lineas
 
-        # Guardar imagen
         nombre_imagen, extension = os.path.splitext(imagen_path)
         imagen_modificada = f"{nombre_imagen}_modificada{extension}"
         imagen.save(imagen_modificada)
@@ -171,17 +161,16 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
     except FileNotFoundError:
         print("Error: Archivo no encontrado.")
     except Exception as e:
-        print(f"Ocurrió un error: {e}")
+        print(f"Ocurrio un error: {e}")
 
 # Parámetros
 imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
 archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
 hoja_a_usar = "Sheet1"
-rango_a_leer = "A1:F10"
+rango_a_leer = "A1:G10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
-anchos_definidos = [124, 125, 126, 124, 125, 124, 125, 124, 125, 124, 125, 124, 125, 124]
-column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'  # Ruta del XML de columnas
+anchos_definidos = [124, 125, 126, 124, 125, 150, 125]
+column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'
 
-# Ejecutar
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
