@@ -49,7 +49,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
             recorte = imagen_binarizada.crop((x - margen_lateral, y, x + ancho + margen_lateral, y + sep_lineas))
             recorte = recorte.resize((recorte.width * 3, recorte.height * 2))
             # --- esta parte de aqui guarda los recortes temporales ---
-            recorte.save(f"recorte_f{fila}_c{col}.png")
+            recorte.save(f"Recortes/recorte_f{fila}_c{col}.png")
             # --------
             texto = pytesseract.image_to_string(recorte, config='--psm 6').strip()
             fila_textos.append(texto)
