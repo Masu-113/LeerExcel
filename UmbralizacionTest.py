@@ -70,15 +70,13 @@ def es_texto_ruido(texto):
         return True
     if not re.search(r"[A-Za-z0-9]", texto):
         return True
-    # Añadir condición: menos de 5 caracteres y solo letras y espacios
-    if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "").isalpha():
+    #menos de 5 caracteres y solo letras y espacios
+    if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "    ").isalpha():
         return True
 
     return False
 
-def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas,
-                                  fuente_path=None, tamaño_fuente=11,
-                                  anchos_columnas_definidos=None, column_xml_path=None):
+def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas, fuente_path=None, tamaño_fuente=11, anchos_columnas_definidos=None, column_xml_path=None):
     try:
         imagen = Image.open(imagen_path)
         dibujo = ImageDraw.Draw(imagen)
@@ -117,12 +115,12 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         new_image_shape = (imagen.height, imagen.width)
 
         column_bounding_box, table_bounding_box = get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, [])
-        print("Cuadros delimitadores de columnas:", column_bounding_box)
+        print("Cuadros delimitadores de columnas: ", column_bounding_box)
 
         anchos_col = [column[2] - column[0] for column in column_bounding_box]
         #posiciones para marcar donde va a dibujar y el espacio entre cada cap
         originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=39, margen_lateral=46)
-        print("Textos originales extraidos:", originales_array)
+        print("Textos originales extraidos: ", originales_array)
 
         y_actual = posicion_y
         tolerancia_pixeles = 15
@@ -149,7 +147,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                     if ancho_nuevo > ancho_original + tolerancia_pixeles:
                         print(f"No se sobrescribio: [{texto_nuevo}] no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
                         x_actual += anchos_columnas[c_idx] +  42
-                        continue
+                        continue # si no alcanza el nuevo dato en la casilla no lo sobrescribe y pasa al siguiente
                 # --- fondo del texto ---
                 left, top, right, bottom = dibujo.textbbox((x_actual, y_actual), texto_nuevo, font=fuente)
                 dibujo.rectangle((left-2, top-2, right+2, bottom+2), fill="white")
@@ -168,14 +166,13 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
     except Exception as e:
         print(f"Ocurrio un error: {e}")
 
-# Parámetros
 imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
 archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
 hoja_a_usar = "Sheet1"
 rango_a_leer = "A1:G10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
-anchos_definidos = [125, 126, 126, 124, 125, 150, 125]
+anchos_definidos = [125, 126, 126, 124, 125, 150, 125] #espacio entre las columnas
 column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'
 
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
