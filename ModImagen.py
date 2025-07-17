@@ -18,7 +18,6 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         for row in sheet[rango_celdas]:
             fila_datos = [cell.value for cell in row]
             datos.append(fila_datos)
-
         # Convertir datos a un array de NumPy para un mejor manejo
         datos_array = np.array(datos)
 
