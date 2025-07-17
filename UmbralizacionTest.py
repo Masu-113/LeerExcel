@@ -87,7 +87,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         sheet = workbook[hoja_excel]
         datos = [[cell.value for cell in row] for row in sheet[rango_celdas]]
         datos_array = np.array(datos)
-        print("Datos leidos del Excel:", datos_array)
+        print(f"Datos leidos del Excel: {datos_array}")
 
         if fuente_path and os.path.exists(fuente_path):
             try:
@@ -140,19 +140,24 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 if f_idx < originales_array.shape[0] and c_idx < originales_array.shape[1]:
                     texto_original = originales_array[f_idx][c_idx]
                 ancho_original = dibujo.textbbox((0, 0), texto_original, font=fuente)[2] - dibujo.textbbox((0, 0), texto_original, font=fuente)[0]
-                print(f"Dato: [{texto_nuevo}] hubicado en columna {c_idx + 1}, fila {f_idx + 1}")
+                print(f"Dato: [{texto_nuevo}] hubicado en (columna {c_idx + 1}, fila {f_idx + 1})")
 
                 if texto_original.strip() == "" or es_texto_ruido(texto_original):
                     if ancho_nuevo > anchos_col[c_idx] + tolerancia_pixeles:
                         print(f"Advertencia: [{texto_nuevo}] podria no caber en columna {c_idx + 1}, fila {f_idx + 1} (celda vacia en imagen)")
                 else:
                     if ancho_nuevo > ancho_original + tolerancia_pixeles:
-                        print(f"Advertencia: [{texto_nuevo}] no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
-
+                        print(f"No se sobrescribio: [{texto_nuevo}] no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
+                        x_actual += anchos_columnas[c_idx] +  42
+                        continue
+                # --- fondo del texto ---
+                left, top, right, bottom = dibujo.textbbox((x_actual, y_actual), texto_nuevo, font=fuente)
+                dibujo.rectangle((left-2, top-2, right+2, bottom+2), fill="white")
+                # --- --- --- --- --- ---
                 dibujo.text((x_actual, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
                 x_actual += anchos_columnas[c_idx] +  42
             y_actual += separacion_lineas
-
+        
         nombre_imagen, extension = os.path.splitext(imagen_path)
         imagen_modificada = f"{nombre_imagen}_modificada{extension}"
         imagen.save(imagen_modificada)
@@ -170,7 +175,7 @@ hoja_a_usar = "Sheet1"
 rango_a_leer = "A1:G10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
-anchos_definidos = [124, 125, 126, 124, 125, 150, 125]
+anchos_definidos = [125, 126, 126, 124, 125, 150, 125]
 column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'
 
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
