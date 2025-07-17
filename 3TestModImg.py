@@ -122,7 +122,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         anchos_col = [column[2] - column[0] for column in column_bounding_box]
         #posiciones para marcar donde va a dibujar y el espacio entre cada cap
         originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=39, margen_lateral=46)
-        print("Textos originales extraídos:", originales_array)
+        print("Textos originales extraidos:", originales_array)
 
         y_actual = posicion_y
         tolerancia_pixeles = 15
@@ -139,12 +139,11 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 texto_original = ""
                 if f_idx < originales_array.shape[0] and c_idx < originales_array.shape[1]:
                     texto_original = originales_array[f_idx][c_idx]
-
                 ancho_original = dibujo.textbbox((0, 0), texto_original, font=fuente)[2] - dibujo.textbbox((0, 0), texto_original, font=fuente)[0]
-
+                print(f"Dato: '{texto_nuevo}' hubicado en columna {c_idx + 1}, fila {f_idx + 1}")
                 if texto_original.strip() == "" or es_texto_ruido(texto_original):
                     if ancho_nuevo > anchos_col[c_idx] + tolerancia_pixeles:
-                        print(f"Advertencia: '{texto_nuevo}' podría no caber en columna {c_idx + 1}, fila {f_idx + 1} (celda vacía en imagen)")
+                        print(f"Advertencia: '{texto_nuevo}' podria no caber en columna {c_idx + 1}, fila {f_idx + 1} (celda vacia en imagen)")
                 else:
                     if ancho_nuevo > ancho_original + tolerancia_pixeles:
                         print(f"Advertencia: '{texto_nuevo}' no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
@@ -164,16 +163,13 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrió un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
-hoja_a_usar = "Hoja1"
-rango_a_leer = "A1:F10"
+imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
+hoja_a_usar = "Sheet1"
+rango_a_leer = "A1:G10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
-anchos_definidos = [124, 125, 126, 124, 125, 124]
-column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\column_bounding_boxes.xml'
+anchos_definidos = [124, 125, 126, 124, 125, 150, 125]
+column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'
 
-# Ejecutar
-sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar,
-                              rango_a_leer, fuente_personalizada,
-                              tamaño_fuente, anchos_definidos, column_xml_path)
+sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
