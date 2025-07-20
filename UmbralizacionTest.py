@@ -70,6 +70,8 @@ def es_texto_ruido(texto):
         return True
     if not re.search(r"[A-Za-z0-9]", texto):
         return True
+    if re.fullmatch(r"ee \|", texto):  # Considerar 'ee |' como ruido
+        return True
     # Añadir condición: menos de 5 caracteres y solo letras y espacios
     if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "").isalpha():
         return True
@@ -120,12 +122,12 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print("Cuadros delimitadores de columnas:", column_bounding_box)
 
         anchos_col = [column[2] - column[0] for column in column_bounding_box]
-        #posiciones para marcar donde va a dibujar y el espacio entre cada cap
-        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=39, margen_lateral=46)
+        #posiciones para marcar donde va a dibujar y el espacio entre cada captura
+        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=28, margen_lateral=43)
         print("Textos originales extraidos:", originales_array)
 
         y_actual = posicion_y
-        tolerancia_pixeles = 15
+        tolerancia_pixeles = 20
 
         for f_idx, fila in enumerate(datos_array):
             if all(dato is None for dato in fila):
@@ -151,10 +153,22 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                         x_actual += anchos_columnas[c_idx] +  42
                         continue
                 # --- fondo del texto ---
-                left, top, right, bottom = dibujo.textbbox((x_actual, y_actual), texto_nuevo, font=fuente)
-                dibujo.rectangle((left-2, top-2, right+2, bottom+2), fill="white")
-                # --- --- --- --- --- ---
-                dibujo.text((x_actual, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
+                # Calcular el ancho del texto a dibujar
+                ancho_texto_nuevo = dibujo.textbbox((0, 0), texto_nuevo, font=fuente)[2]
+
+                # esto es para modificar la alineacion de todos los datos de columnas en especifico
+                if c_idx == 5:
+                    x_pos_dibujo = x_actual + anchos_columnas[c_idx] - ancho_texto_nuevo
+                else:
+                    x_pos_dibujo = x_actual
+
+                # Fondo del texto
+                left, top, right, bottom = dibujo.textbbox((x_pos_dibujo, y_actual), texto_nuevo, font=fuente)
+                dibujo.rectangle((left-4, top-2, right+2, bottom+2), fill="blue")
+
+                # Dibujo del texto
+                dibujo.text((x_pos_dibujo, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
+
                 x_actual += anchos_columnas[c_idx] +  42
             y_actual += separacion_lineas
         
@@ -169,13 +183,14 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrio un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
-hoja_a_usar = "Sheet1"
+imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
+hoja_a_usar = "Hoja1"
 rango_a_leer = "A1:G10"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
 tamaño_fuente = 30
+#esto es para definir la distancia en pixeles de las columnas q se imprimen
 anchos_definidos = [125, 126, 126, 124, 125, 150, 125]
-column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'
+column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\column_bounding_boxes.xml'
 
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
