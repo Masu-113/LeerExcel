@@ -5,6 +5,31 @@ import numpy as np
 import pytesseract
 import xml.etree.ElementTree as ET
 import re
+from pdf2image import convert_from_path
+import img2pdf
+
+# Función para convertir PDF a imágenes
+def pdf_to_images(pdf_path, output_dir):
+    try:
+        images = convert_from_path(pdf_path)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        for i, image in enumerate(images):
+            image_path = os.path.join(output_dir, f"page_{i+1}.jpg")
+            image.save(image_path, "JPEG")  # Guardar como JPEG
+            print(f"Página {i+1} guardada como {image_path}")
+
+    except Exception as e:
+        print(f"Error durante la conversión: {e}")
+
+# Función para convertir imágenes a PDF
+def convert_images_to_pdf(image_list, pdf_path):
+    with open(pdf_path, "wb") as f:
+        f.write(img2pdf.convert(image_list))
+
+# Otras funciones (get_column_bounding_box, obtener_textos_originales, es_texto_ruido, sobrescribir_imagen_con_excel) se mantienen igual
 
 def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, table_bounding_box, threshhold=3):
     root = ET.parse(column_xml_path).getroot()
@@ -57,7 +82,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
         datos_originales.append(fila_textos)
 
     return np.array(datos_originales)
-#esto es para limpiar el ruido en  la imagen
+
 def es_texto_ruido(texto):
     texto = texto.strip()
     if texto == "":
@@ -122,7 +147,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print("Cuadros delimitadores de columnas:", column_bounding_box)
 
         anchos_col = [column[2] - column[0] for column in column_bounding_box]
-        #posiciones para marcar donde va a dibujar y el espacio entre cada captura
+        # posiciones para marcar donde va a dibujar y el espacio entre cada captura
         originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=6, margen_lateral=15)
         print("Textos originales extraidos:", originales_array)
 
@@ -183,20 +208,39 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         imagen.save(imagen_modificada)
         print(f"Imagen guardada como {imagen_modificada}")
 
+        return imagen_modificada  # Devolver el nombre de la imagen modificada
+
     except FileNotFoundError:
         print("Error: Archivo no encontrado.")
     except Exception as e:
         print(f"Ocurrio un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
-hoja_a_usar = "Hoja1"
-rango_a_leer = "A1:G10"
-fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
-tamaño_fuente = 30
-#esto es para definir la distancia en pixeles de las columnas q se imprimen
-anchos_definidos = [125, 126, 126, 124, 125, 175, 125]
-column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\column_bounding_boxes.xml'
+pdf_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\documento_modificado.pdf'  # Ruta del PDF a convertir
+output_dir = r"C:\Users\Marlon Jose\source\repos\LeerExcel\prueba"  # Directorio para guardar imágenes
+excel_path = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'  # Ruta del archivo Excel
+hoja_a_usar = "Hoja1"  # Nombre de la hoja en el Excel
+rango_a_leer = "A1:G10"  # Rango de celdas a leer
+fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'  # Ruta de la fuente personalizada
+tamaño_fuente = 30  # Tamaño de la fuente
+anchos_definidos = [125, 126, 126, 124, 125, 175, 125]  # Anchos de las columnas
+column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml'  # Ruta del archivo XML
 
-sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
+# Paso 1: Convertir PDF a imágenes
+pdf_to_images(pdf_path, output_dir)
+
+# Paso 2: Sobrescribir imagen con datos de Excel
+image_path = os.path.join(output_dir, "page_1.jpg")  # Suponiendo que solo hay una página para simplificar
+imagen_modificada = sobrescribir_imagen_con_excel(image_path, excel_path, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
+
+# Verificar si las imágenes existen antes de convertirlas a PDF
+if not os.path.exists(image_path):
+    print(f"Error: La imagen original {image_path} no se encontró.")
+elif imagen_modificada is None:
+    print("Error: La imagen modificada no se generó correctamente.")
+else:
+    # Paso 3: Convertir imágenes a PDF
+    image_files = [image_path, imagen_modificada]  # Agregar la imagen original y la modificada
+    output_pdf = os.path.join(output_dir, "mi_documento.pdf")  # Ruta del PDF de salida
+    convert_images_to_pdf(image_files, output_pdf)
+    print(f"PDF generado: {output_pdf}")
