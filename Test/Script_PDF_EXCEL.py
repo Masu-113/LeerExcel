@@ -5,6 +5,29 @@ import numpy as np
 import pytesseract
 import xml.etree.ElementTree as ET
 import re
+from pdf2image import convert_from_path
+import img2pdf
+
+# Función para convertir PDF a imágenes
+def pdf_to_images(pdf_path, output_dir):
+    try:
+        images = convert_from_path(pdf_path)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        for i, image in enumerate(images):
+            image_path = os.path.join(output_dir, f"page_{i+1}.jpg")
+            image.save(image_path, "JPEG")  # Guardar como JPEG
+            print(f"Página {i+1} guardada como {image_path}")
+
+    except Exception as e:
+        print(f"Error durante la conversión: {e}")
+
+# Función para convertir imágenes a PDF
+def convert_images_to_pdf(image_list, pdf_path):
+    with open(pdf_path, "wb") as f:
+        f.write(img2pdf.convert(image_list))
 
 def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, table_bounding_box, threshhold=3):
     root = ET.parse(column_xml_path).getroot()
@@ -49,7 +72,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
             recorte = imagen_binarizada.crop((x - margen_lateral, y, x + ancho + margen_lateral, y + sep_lineas))
             recorte = recorte.resize((recorte.width * 3, recorte.height * 2))
             # --- esta parte de aqui guarda los recortes temporales ---
-            recorte.save(f"recorte_f{fila}_c{col}.png")
+            recorte.save(f"Recortes/recorte_f{fila}_c{col}.png")
             # --------
             texto = pytesseract.image_to_string(recorte, config='--psm 6').strip()
             fila_textos.append(texto)
@@ -57,7 +80,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
         datos_originales.append(fila_textos)
 
     return np.array(datos_originales)
-#esto es para limpiar el ruido en  la imagen
+
 def es_texto_ruido(texto):
     texto = texto.strip()
     if texto == "":
@@ -70,15 +93,15 @@ def es_texto_ruido(texto):
         return True
     if not re.search(r"[A-Za-z0-9]", texto):
         return True
+    if re.fullmatch(r"ee \|", texto): 
+        return True
     # Añadir condición: menos de 5 caracteres y solo letras y espacios
     if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "").isalpha():
         return True
 
     return False
 
-def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas,
-                                  fuente_path=None, tamaño_fuente=11,
-                                  anchos_columnas_definidos=None, column_xml_path=None):
+def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas, fuente_path=None, tamaño_fuente=11,anchos_columnas_definidos=None, column_xml_path=None):
     try:
         imagen = Image.open(imagen_path)
         dibujo = ImageDraw.Draw(imagen)
@@ -87,7 +110,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         sheet = workbook[hoja_excel]
         datos = [[cell.value for cell in row] for row in sheet[rango_celdas]]
         datos_array = np.array(datos)
-        print("Datos leídos del Excel:", datos_array)
+        print(f"Datos leidos del Excel: {datos_array}")
 
         if fuente_path and os.path.exists(fuente_path):
             try:
@@ -120,12 +143,14 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print("Cuadros delimitadores de columnas:", column_bounding_box)
 
         anchos_col = [column[2] - column[0] for column in column_bounding_box]
-        #posiciones para marcar donde va a dibujar y el espacio entre cada cap
-        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=39, margen_lateral=46)
+        # posiciones para marcar donde va a dibujar y el espacio entre cada captura
+        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=6, margen_lateral=15)
         print("Textos originales extraidos:", originales_array)
 
         y_actual = posicion_y
-        tolerancia_pixeles = 15
+        tolerancia_pixeles = 35
+        margen_seguridad = 12 
+        posiciones_columnas = [bbox[0] for bbox in column_bounding_box]
 
         for f_idx, fila in enumerate(datos_array):
             if all(dato is None for dato in fila):
@@ -140,36 +165,75 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 if f_idx < originales_array.shape[0] and c_idx < originales_array.shape[1]:
                     texto_original = originales_array[f_idx][c_idx]
                 ancho_original = dibujo.textbbox((0, 0), texto_original, font=fuente)[2] - dibujo.textbbox((0, 0), texto_original, font=fuente)[0]
-                print(f"Dato: '{texto_nuevo}' hubicado en columna {c_idx + 1}, fila {f_idx + 1}")
-                if texto_original.strip() == "" or es_texto_ruido(texto_original):
-                    if ancho_nuevo > anchos_col[c_idx] + tolerancia_pixeles:
-                        print(f"Advertencia: '{texto_nuevo}' podria no caber en columna {c_idx + 1}, fila {f_idx + 1} (celda vacia en imagen)")
+                print(f"Dato: [{texto_nuevo}] hubicado en (columna {c_idx + 1}, fila {f_idx + 1})")
+
+                # Calcular el ancho de la casilla en la imagen
+                if c_idx < len(posiciones_columnas) - 1:
+                    ancho_casilla = posiciones_columnas[c_idx + 1] - posiciones_columnas[c_idx] - margen_seguridad
                 else:
-                    if ancho_nuevo > ancho_original + tolerancia_pixeles:
-                        print(f"Advertencia: '{texto_nuevo}' no cabe en el espacio de '{texto_original}' (columna {c_idx + 1}, fila {f_idx + 1})")
+                    ancho_casilla = anchos_col[c_idx]
+                print(f"Texto: '{texto_nuevo}' | Ancho texto: {ancho_nuevo} | Ancho casilla: {ancho_casilla}")
 
-                dibujo.text((x_actual, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
-                x_actual += anchos_columnas[c_idx] + 42
+                if ancho_nuevo > ancho_casilla and (ancho_nuevo - ancho_casilla) > tolerancia_pixeles:
+                    print(f"No se sobrescribio: [{texto_nuevo}] excede el ancho de la casilla en columna {c_idx + 1}, fila {f_idx + 1}")
+                    x_actual += anchos_columnas[c_idx] + 42
+                    continue
+                # Calcular el ancho del texto a dibujar
+                ancho_texto_nuevo = dibujo.textbbox((0, 0), texto_nuevo, font=fuente)[2]
+                # esto es para modificar la alineacion de todos los datos de columnas en especifico
+                if c_idx == 5:
+                    x_pos_dibujo = x_actual + anchos_columnas[c_idx] - ancho_texto_nuevo
+                else:
+                    x_pos_dibujo = x_actual
+                # Fondo del texto
+                left, top, right, bottom = dibujo.textbbox((x_pos_dibujo, y_actual), texto_nuevo, font=fuente)
+                dibujo.rectangle((left-4, top-2, right+2, bottom+2), fill="blue")
+                # Dibujo del texto
+                dibujo.text((x_pos_dibujo, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
+                x_actual += anchos_columnas[c_idx] +  42
             y_actual += separacion_lineas
-
+        
         nombre_imagen, extension = os.path.splitext(imagen_path)
         imagen_modificada = f"{nombre_imagen}_modificada{extension}"
         imagen.save(imagen_modificada)
         print(f"Imagen guardada como {imagen_modificada}")
 
+        return imagen_modificada
+
     except FileNotFoundError:
         print("Error: Archivo no encontrado.")
     except Exception as e:
-        print(f"Ocurrió un error: {e}")
+        print(f"Ocurrio un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
-hoja_a_usar = "Sheet1"
-rango_a_leer = "A1:G10"
-fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
-tamaño_fuente = 30
-anchos_definidos = [124, 125, 126, 124, 125, 150, 125]
-column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\column_bounding_boxes.xml'
+pdf_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\documento_modificado.pdf' 
+output_dir = r"C:\Users\Marlon Jose\source\repos\LeerExcel\prueba" 
+excel_path = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
+hoja_a_usar = "Hoja1" 
+rango_a_leer = "A1:G10" 
+fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf' 
+tamaño_fuente = 30 
+anchos_definidos = [125, 126, 126, 124, 125, 175, 125]
+column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml' 
 
-sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
+# Paso 1: Convertir PDF a imágenes
+pdf_to_images(pdf_path, output_dir)
+
+# Paso 2: Sobrescribir imagen con datos de Excel
+image_path = os.path.join(output_dir, "page_1.jpg")
+imagen_modificada = sobrescribir_imagen_con_excel(image_path, excel_path, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
+
+if not os.path.exists(image_path):
+    print(f"Error: La imagen original {image_path} no se encontró.")
+elif imagen_modificada is None:
+    print("Error: La imagen modificada no se generó correctamente.")
+else:
+    # Crear PDF con imagen original
+    output_pdf_original = os.path.join(output_dir, "original.pdf")
+    convert_images_to_pdf([image_path], output_pdf_original)
+    print(f"PDF original generado: {output_pdf_original}")
+    # Crear PDF con imagen modificada
+    output_pdf_modificada = os.path.join(output_dir, "modificada.pdf")
+    convert_images_to_pdf([imagen_modificada], output_pdf_modificada)
+    print(f"PDF modificada generado: {output_pdf_modificada}")
+
