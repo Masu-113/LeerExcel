@@ -29,8 +29,6 @@ def convert_images_to_pdf(image_list, pdf_path):
     with open(pdf_path, "wb") as f:
         f.write(img2pdf.convert(image_list))
 
-# Otras funciones (get_column_bounding_box, obtener_textos_originales, es_texto_ruido, sobrescribir_imagen_con_excel) se mantienen igual
-
 def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, table_bounding_box, threshhold=3):
     root = ET.parse(column_xml_path).getroot()
     column_bounding_box = []
@@ -95,7 +93,7 @@ def es_texto_ruido(texto):
         return True
     if not re.search(r"[A-Za-z0-9]", texto):
         return True
-    if re.fullmatch(r"ee \|", texto):  # Considerar 'ee |' como ruido
+    if re.fullmatch(r"ee \|", texto): 
         return True
     # Añadir condición: menos de 5 caracteres y solo letras y espacios
     if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "").isalpha():
@@ -103,9 +101,7 @@ def es_texto_ruido(texto):
 
     return False
 
-def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas,
-                                  fuente_path=None, tamaño_fuente=11,
-                                  anchos_columnas_definidos=None, column_xml_path=None):
+def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_celdas, fuente_path=None, tamaño_fuente=11,anchos_columnas_definidos=None, column_xml_path=None):
     try:
         imagen = Image.open(imagen_path)
         dibujo = ImageDraw.Draw(imagen)
@@ -153,7 +149,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
 
         y_actual = posicion_y
         tolerancia_pixeles = 35
-        margen_seguridad = 12  # o el valor que te funcione mejor
+        margen_seguridad = 12 
         posiciones_columnas = [bbox[0] for bbox in column_bounding_box]
 
         for f_idx, fila in enumerate(datos_array):
@@ -171,35 +167,29 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 ancho_original = dibujo.textbbox((0, 0), texto_original, font=fuente)[2] - dibujo.textbbox((0, 0), texto_original, font=fuente)[0]
                 print(f"Dato: [{texto_nuevo}] hubicado en (columna {c_idx + 1}, fila {f_idx + 1})")
 
-                # Calcular el ancho de la casilla en la imagen (basado en coordenadas)
+                # Calcular el ancho de la casilla en la imagen
                 if c_idx < len(posiciones_columnas) - 1:
                     ancho_casilla = posiciones_columnas[c_idx + 1] - posiciones_columnas[c_idx] - margen_seguridad
                 else:
-                    ancho_casilla = anchos_col[c_idx]  # última columna, usar valor estimado
+                    ancho_casilla = anchos_col[c_idx]
                 print(f"Texto: '{texto_nuevo}' | Ancho texto: {ancho_nuevo} | Ancho casilla: {ancho_casilla}")
 
                 if ancho_nuevo > ancho_casilla and (ancho_nuevo - ancho_casilla) > tolerancia_pixeles:
                     print(f"No se sobrescribio: [{texto_nuevo}] excede el ancho de la casilla en columna {c_idx + 1}, fila {f_idx + 1}")
                     x_actual += anchos_columnas[c_idx] + 42
                     continue
-
-                # --- fondo del texto ---
                 # Calcular el ancho del texto a dibujar
                 ancho_texto_nuevo = dibujo.textbbox((0, 0), texto_nuevo, font=fuente)[2]
-
                 # esto es para modificar la alineacion de todos los datos de columnas en especifico
                 if c_idx == 5:
                     x_pos_dibujo = x_actual + anchos_columnas[c_idx] - ancho_texto_nuevo
                 else:
                     x_pos_dibujo = x_actual
-
                 # Fondo del texto
                 left, top, right, bottom = dibujo.textbbox((x_pos_dibujo, y_actual), texto_nuevo, font=fuente)
                 dibujo.rectangle((left-4, top-2, right+2, bottom+2), fill="blue")
-
                 # Dibujo del texto
                 dibujo.text((x_pos_dibujo, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
-
                 x_actual += anchos_columnas[c_idx] +  42
             y_actual += separacion_lineas
         
@@ -208,7 +198,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         imagen.save(imagen_modificada)
         print(f"Imagen guardada como {imagen_modificada}")
 
-        return imagen_modificada  # Devolver el nombre de la imagen modificada
+        return imagen_modificada
 
     except FileNotFoundError:
         print("Error: Archivo no encontrado.")
@@ -216,31 +206,34 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrio un error: {e}")
 
 # Parámetros
-pdf_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\documento_modificado.pdf'  # Ruta del PDF a convertir
-output_dir = r"C:\Users\Marlon Jose\source\repos\LeerExcel\prueba"  # Directorio para guardar imágenes
-excel_path = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'  # Ruta del archivo Excel
-hoja_a_usar = "Hoja1"  # Nombre de la hoja en el Excel
-rango_a_leer = "A1:G10"  # Rango de celdas a leer
-fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'  # Ruta de la fuente personalizada
-tamaño_fuente = 30  # Tamaño de la fuente
-anchos_definidos = [125, 126, 126, 124, 125, 175, 125]  # Anchos de las columnas
-column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml'  # Ruta del archivo XML
+pdf_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\documento_modificado.pdf' 
+output_dir = r"C:\Users\Marlon Jose\source\repos\LeerExcel\prueba" 
+excel_path = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
+hoja_a_usar = "Hoja1" 
+rango_a_leer = "A1:G10" 
+fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf' 
+tamaño_fuente = 30 
+anchos_definidos = [125, 126, 126, 124, 125, 175, 125]
+column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml' 
 
 # Paso 1: Convertir PDF a imágenes
 pdf_to_images(pdf_path, output_dir)
 
 # Paso 2: Sobrescribir imagen con datos de Excel
-image_path = os.path.join(output_dir, "page_1.jpg")  # Suponiendo que solo hay una página para simplificar
+image_path = os.path.join(output_dir, "page_1.jpg")
 imagen_modificada = sobrescribir_imagen_con_excel(image_path, excel_path, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
 
-# Verificar si las imágenes existen antes de convertirlas a PDF
 if not os.path.exists(image_path):
     print(f"Error: La imagen original {image_path} no se encontró.")
 elif imagen_modificada is None:
     print("Error: La imagen modificada no se generó correctamente.")
 else:
-    # Paso 3: Convertir imágenes a PDF
-    image_files = [image_path, imagen_modificada]  # Agregar la imagen original y la modificada
-    output_pdf = os.path.join(output_dir, "mi_documento.pdf")  # Ruta del PDF de salida
-    convert_images_to_pdf(image_files, output_pdf)
-    print(f"PDF generado: {output_pdf}")
+    # Crear PDF con imagen original
+    output_pdf_original = os.path.join(output_dir, "original.pdf")
+    convert_images_to_pdf([image_path], output_pdf_original)
+    print(f"PDF original generado: {output_pdf_original}")
+    # Crear PDF con imagen modificada
+    output_pdf_modificada = os.path.join(output_dir, "modificada.pdf")
+    convert_images_to_pdf([imagen_modificada], output_pdf_modificada)
+    print(f"PDF modificada generado: {output_pdf_modificada}")
+
