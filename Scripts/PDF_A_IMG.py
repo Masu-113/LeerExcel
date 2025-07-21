@@ -19,4 +19,4 @@ def pdf_to_images(pdf_path, output_dir):
         print(f"Error durante la conversión: {e}")
 
 if __name__ == "__main__":
-    pdf_to_images(pdf_path = r'C:\Users\msuarez\Documents\TestExcel.pdf', output_dir="prueba")
+    pdf_to_images(pdf_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\documento_modificado.pdf', output_dir="prueba")
