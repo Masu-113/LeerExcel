@@ -1,11 +1,12 @@
-# interfaz.py dentro de /view
 import sys
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Test.Script_PDF_EXCEL import sobrescribir_imagen_con_excel  # Asegúrate de que esta función haga todo (PDF→IMG, modificar, IMG→PDF)
+from Scripts.PDF_A_IMG import pdf_to_images
+from Scripts.IMG_A_PDF import convert_images_to_pdf
+from Test.Script_PDF_EXCEL import sobrescribir_imagen_con_excel
 
 def mostrar_gui():
     def ejecutar_proceso():
@@ -14,21 +15,35 @@ def mostrar_gui():
             excel = entry_excel.get()
             hoja = entry_hoja.get()
             rango = entry_rango.get()
-            fuente = entry_fuente.get()
-            tamaño_fuente = int(entry_tamaño_fuente.get())
-            xml = entry_xml.get()
 
-            if not all([pdf, excel, hoja, rango, xml]):
+            if not all([pdf, excel, hoja, rango]):
                 messagebox.showwarning("Campos incompletos", "Por favor, completa todos los campos obligatorios.")
                 return
 
+            # Rutas por defecto
+            fuente = r"C:\Windows\Fonts\Arial.ttf"
+            tamaño_fuente = 30
+            xml = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Scripts", "column_bounding_boxes.xml"))
             anchos_definidos = [125, 126, 126, 124, 125, 173, 125]
 
-            # Este método debe encargarse de TODO:
-            # PDF → imagen → modificación → nuevo PDF
-            sobrescribir_imagen_con_excel(pdf, excel, hoja, rango, fuente, tamaño_fuente, anchos_definidos, xml)
+            output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "output"))
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
 
-            messagebox.showinfo("Éxito", "¡Proceso completado con éxito!")
+            image_path = os.path.join(output_dir, "page_1.jpg")
+            image_modificada = os.path.join(output_dir, "page_1_modificada.jpg")
+            final_pdf_path = os.path.join(output_dir, "final.pdf")
+
+            # Paso 1: PDF → Imagen
+            pdf_to_images(pdf, output_dir)
+
+            # Paso 2: Sobrescribir con datos del Excel
+            sobrescribir_imagen_con_excel(image_path, excel, hoja, rango, fuente, tamaño_fuente, anchos_definidos, xml)
+
+            # Paso 3: Convertir a PDF
+            convert_images_to_pdf([image_modificada], final_pdf_path)
+
+            messagebox.showinfo("Éxito", f"Proceso completado.\nPDF generado: {final_pdf_path}")
 
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error: {e}")
@@ -45,21 +60,9 @@ def mostrar_gui():
             entry_excel.delete(0, tk.END)
             entry_excel.insert(0, ruta)
 
-    def seleccionar_fuente():
-        ruta = filedialog.askopenfilename(filetypes=[("Fuentes", "*.ttf")])
-        if ruta:
-            entry_fuente.delete(0, tk.END)
-            entry_fuente.insert(0, ruta)
-
-    def seleccionar_xml():
-        ruta = filedialog.askopenfilename(filetypes=[("Archivos XML", "*.xml")])
-        if ruta:
-            entry_xml.delete(0, tk.END)
-            entry_xml.insert(0, ruta)
-
     ventana = tk.Tk()
     ventana.title("Generar PDF desde Excel y PDF Base")
-    ventana.geometry("600x400")
+    ventana.geometry("600x300")
 
     def crear_entrada(label_text, row, browse_func=None):
         label = tk.Label(ventana, text=label_text)
@@ -77,13 +80,9 @@ def mostrar_gui():
     entry_hoja.insert(0, "Hoja1")
     entry_rango = crear_entrada("Rango de celdas:", 3)
     entry_rango.insert(0, "A1:G10")
-    entry_fuente = crear_entrada("Fuente (opcional):", 4, seleccionar_fuente)
-    entry_tamaño_fuente = crear_entrada("Tamaño de fuente:", 5)
-    entry_tamaño_fuente.insert(0, "30")
-    entry_xml = crear_entrada("XML de columnas:", 6, seleccionar_xml)
 
     boton_ejecutar = tk.Button(ventana, text="Ejecutar", bg="green", fg="white", command=ejecutar_proceso)
-    boton_ejecutar.grid(row=7, column=1, pady=20)
+    boton_ejecutar.grid(row=4, column=1, pady=20)
 
     ventana.mainloop()
 
