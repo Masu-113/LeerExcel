@@ -148,7 +148,7 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print("Textos originales extraidos:", originales_array)
 
         y_actual = posicion_y
-        tolerancia_pixeles = 35
+        tolerancia_pixeles = 40
         margen_seguridad = 12 
         posiciones_columnas = [bbox[0] for bbox in column_bounding_box]
 
@@ -206,15 +206,15 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrio un error: {e}")
 
 # Parámetros
-pdf_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\documento_modificado.pdf' 
-output_dir = r"C:\Users\Marlon Jose\source\repos\LeerExcel\prueba" 
-excel_path = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
-hoja_a_usar = "Hoja1" 
+pdf_path = r'C:\Users\msuarez\source\repos\LeerExcel\documento_modificado.pdf' 
+output_dir = r'C:\Users\msuarez\source\repos\LeerExcel\prueba' 
+excel_path = r'C:\Users\msuarez\Documents\TestExcel.xlsx'
+hoja_a_usar = "Sheet1" 
 rango_a_leer = "A1:G10" 
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf' 
 tamaño_fuente = 30 
 anchos_definidos = [125, 126, 126, 124, 125, 175, 125]
-column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml' 
+column_xml_path = r'C:\Users\msuarez\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml' 
 
 # Paso 1: Convertir PDF a imágenes
 pdf_to_images(pdf_path, output_dir)
