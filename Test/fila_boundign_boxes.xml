@@ -61,4 +61,12 @@
             <ymax>200</ymax>
         </bndbox>
     </fila>
+    <fila>
+        <bndbox>
+            <xmin>-70</xmin>
+            <ymin>100</ymin>
+            <xmax>400</xmax>
+            <ymax>200</ymax>
+        </bndbox>
+    </fila>
 </bloque>
