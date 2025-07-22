@@ -24,9 +24,11 @@ def get_column_bounding_box(column_xml_path, old_image_shape, new_image_shape, t
         scaled_xmax = round(xmax * scale_x)
         scaled_ymax = round(ymax * scale_y)
 
-        column_bounding_box.append((scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax))
+        # Agregar solo cajas únicas
+        if (scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax) not in column_bounding_box:
+            column_bounding_box.append((scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax))
 
-    if len(table_bounding_box) == 0:
+    if len(table_bounding_box) == 0 and column_bounding_box:
         min_x = min(bbox[0] for bbox in column_bounding_box) - threshhold
         min_y = min(bbox[1] for bbox in column_bounding_box) - threshhold
         max_x = max(bbox[2] for bbox in column_bounding_box) + threshhold
@@ -45,7 +47,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
         x = pos_x + offset_x
         y = pos_y + fila * sep_lineas
         for col in range(columnas):
-            ancho = anchos_col[col]
+            ancho = anchos_col[col] if col < len(anchos_col) else 0  # Verificar longitud
             recorte = imagen_binarizada.crop((x - margen_lateral, y, x + ancho + margen_lateral, y + sep_lineas))
             recorte = recorte.resize((recorte.width * 3, recorte.height * 2))
             # --- esta parte de aqui guarda los recortes temporales ---
@@ -57,7 +59,7 @@ def obtener_textos_originales(imagen, filas, columnas, pos_x, pos_y, sep_lineas,
         datos_originales.append(fila_textos)
 
     return np.array(datos_originales)
-#esto es para limpiar el ruido en  la imagen
+
 def es_texto_ruido(texto):
     texto = texto.strip()
     if texto == "":
@@ -72,7 +74,6 @@ def es_texto_ruido(texto):
         return True
     if re.fullmatch(r"ee \|", texto):  # Considerar 'ee |' como ruido
         return True
-    # Añadir condición: menos de 5 caracteres y solo letras y espacios
     if len(texto.replace(" ", "")) <= 4 and texto.replace(" ", "").isalpha():
         return True
 
@@ -99,8 +100,8 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         else:
             fuente = ImageFont.load_default()
 
-        posicion_x = 147
-        posicion_y = 153
+        posicion_x = 140
+        posicion_y = 948
         separacion_lineas = tamaño_fuente + 13
         num_columnas = datos_array.shape[1]
         num_filas = datos_array.shape[0]
@@ -122,8 +123,11 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print("Cuadros delimitadores de columnas:", column_bounding_box)
 
         anchos_col = [column[2] - column[0] for column in column_bounding_box]
-        #posiciones para marcar donde va a dibujar y el espacio entre cada captura
-        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=6, margen_lateral=15)
+        if not anchos_col:  # Verifica si anchos_col está vacío
+            print("Error: No se encontraron cuadros delimitadores de columnas.")
+            return
+
+        originales_array = obtener_textos_originales(imagen, num_filas, num_columnas, posicion_x, posicion_y, separacion_lineas, anchos_col, offset_x=6, margen_lateral=14)
         print("Textos originales extraidos:", originales_array)
 
         y_actual = posicion_y
@@ -136,6 +140,10 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 continue
             x_actual = posicion_x
             for c_idx, dato in enumerate(fila):
+                if c_idx >= len(originales_array[0]):  # Verificar longitud
+                    print(f"Advertencia: Índice de columna {c_idx} fuera de rango para fila {f_idx}.")
+                    continue
+
                 texto_nuevo = str(dato) if dato is not None else ""
                 bbox_nuevo = dibujo.textbbox((0, 0), texto_nuevo, font=fuente)
                 ancho_nuevo = bbox_nuevo[2] - bbox_nuevo[0]
@@ -143,6 +151,10 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
                 texto_original = ""
                 if f_idx < originales_array.shape[0] and c_idx < originales_array.shape[1]:
                     texto_original = originales_array[f_idx][c_idx]
+                else:
+                    print(f"Advertencia: No se encontró texto original para columna {c_idx} en fila {f_idx}.")
+                    texto_original = ""  # Asignar texto vacío si no hay texto original
+
                 ancho_original = dibujo.textbbox((0, 0), texto_original, font=fuente)[2] - dibujo.textbbox((0, 0), texto_original, font=fuente)[0]
                 print(f"Dato: [{texto_nuevo}] hubicado en (columna {c_idx + 1}, fila {f_idx + 1})")
 
@@ -170,12 +182,12 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
 
                 # Fondo del texto
                 left, top, right, bottom = dibujo.textbbox((x_pos_dibujo, y_actual), texto_nuevo, font=fuente)
-                dibujo.rectangle((left-4, top-2, right+2, bottom+2), fill="white")
+                dibujo.rectangle((left-4, top-2, right+2, bottom+2), fill="blue")
 
                 # Dibujo del texto
                 dibujo.text((x_pos_dibujo, y_actual), texto_nuevo, font=fuente, fill=(0, 0, 0))
 
-                x_actual += anchos_columnas[c_idx] +  42
+                x_actual += anchos_columnas[c_idx] + 42
             y_actual += separacion_lineas
         
         nombre_imagen, extension = os.path.splitext(imagen_path)
@@ -189,14 +201,14 @@ def sobrescribir_imagen_con_excel(imagen_path, excel_path, hoja_excel, rango_cel
         print(f"Ocurrio un error: {e}")
 
 # Parámetros
-imagen_a_modificar = r'C:\Users\Marlon Jose\source\repos\LeerExcel\prueba\page_1.jpg'
-archivo_excel = r'C:\Users\Marlon Jose\Documents\PruebaExcel.xlsx'
-hoja_a_usar = "Hoja1"
-rango_a_leer = "A1:G10"
+imagen_a_modificar = r'C:\Users\msuarez\source\repos\LeerExcel\prueba\page_1.jpg'
+archivo_excel = r'C:\Users\msuarez\Downloads\Radiotrayectos - datos de ejemplo (1).xlsx'
+hoja_a_usar = "Sheet1"
+rango_a_leer = "A2:H2"
 fuente_personalizada = r'C:\Windows\Fonts\Arial.ttf'
-tamaño_fuente = 30
+tamaño_fuente = 20
 #esto es para definir la distancia en pixeles de las columnas q se imprimen
-anchos_definidos = [125, 126, 126, 124, 125, 173, 125]
-column_xml_path = r'C:\Users\Marlon Jose\source\repos\LeerExcel\Scripts\column_bounding_boxes.xml'
+anchos_definidos = [406, 56, 56, 80, 56, 30, 80, 60, 56, 56]
+column_xml_path = r'Test\fila_boundign_boxes.xml'
 
 sobrescribir_imagen_con_excel(imagen_a_modificar, archivo_excel, hoja_a_usar, rango_a_leer, fuente_personalizada, tamaño_fuente, anchos_definidos, column_xml_path)
